@@ -1,6 +1,7 @@
 mod color;
 mod cores;
 mod graph;
+mod processes;
 
 use std::collections::VecDeque;
 
@@ -17,6 +18,7 @@ use self::{
     color::{Palette, bytes_to_gib},
     cores::core_lines,
     graph::{braille_graph, braille_graph_centered},
+    processes::process_lines,
 };
 
 pub fn render(frame: &mut ratatui::Frame<'_>, app: &App, config: &AppConfig) {
@@ -39,13 +41,12 @@ pub fn render(frame: &mut ratatui::Frame<'_>, app: &App, config: &AppConfig) {
         &app.cpu_history,
         config,
     );
-    render_panel(
+    render_memory_and_processes(
         frame,
         chunks[2],
-        "Memory",
         app.current.memory,
         &app.memory_history,
-        Palette::Memory,
+        &app.current.processes,
         config,
     );
 }
@@ -134,6 +135,59 @@ fn render_panel(
             .ratio((value / 100.0).clamp(0.0, 1.0) as f64)
             .label(format!("{value:.1}%")),
         split[1],
+    );
+}
+
+fn render_memory_and_processes(
+    frame: &mut ratatui::Frame<'_>,
+    area: Rect,
+    memory_value: f32,
+    history: &VecDeque<f32>,
+    processes: &[crate::metrics::ProcessInfo],
+    config: &AppConfig,
+) {
+    let split = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(58), Constraint::Percentage(42)])
+        .split(area);
+
+    render_panel(
+        frame,
+        split[0],
+        "Memory",
+        memory_value,
+        history,
+        Palette::Memory,
+        config,
+    );
+
+    render_process_panel(frame, split[1], processes, config);
+}
+
+fn render_process_panel(
+    frame: &mut ratatui::Frame<'_>,
+    area: Rect,
+    processes: &[crate::metrics::ProcessInfo],
+    config: &AppConfig,
+) {
+    let border = match config.theme {
+        crate::config::ThemeName::Ocean => Color::Rgb(98, 132, 181),
+        crate::config::ThemeName::Ember => Color::Rgb(186, 115, 88),
+        crate::config::ThemeName::Mono => Color::Rgb(140, 140, 140),
+    };
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(" Processes by RAM ")
+        .border_style(Style::default().fg(border));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+    if inner.height < 1 || inner.width < 12 {
+        return;
+    }
+    frame.render_widget(
+        Paragraph::new(process_lines(processes, inner.width, inner.height)),
+        inner,
     );
 }
 

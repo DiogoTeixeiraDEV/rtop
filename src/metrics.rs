@@ -4,7 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use sysinfo::{CpuRefreshKind, MemoryRefreshKind, RefreshKind, System};
+use sysinfo::{CpuRefreshKind, MemoryRefreshKind, ProcessRefreshKind, RefreshKind, System};
 
 #[derive(Debug, Clone)]
 pub struct Metrics {
@@ -14,6 +14,14 @@ pub struct Metrics {
     pub used_memory: u64,
     pub total_memory: u64,
     pub sampled_at: Instant,
+    pub processes: Vec<ProcessInfo>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ProcessInfo {
+    pub pid: u32,
+    pub name: String,
+    pub memory_bytes: u64,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -34,6 +42,7 @@ pub fn default_metrics() -> Metrics {
         used_memory: 0,
         total_memory: 0,
         sampled_at: Instant::now(),
+        processes: Vec::new(),
     }
 }
 
@@ -44,7 +53,8 @@ pub fn spawn_sampler(initial_interval: Duration) -> SamplerHandle {
     thread::spawn(move || {
         let refresh = RefreshKind::new()
             .with_cpu(CpuRefreshKind::everything())
-            .with_memory(MemoryRefreshKind::everything());
+            .with_memory(MemoryRefreshKind::everything())
+            .with_processes(ProcessRefreshKind::everything());
         let mut system = System::new_with_specifics(refresh);
         let mut interval = initial_interval;
 
@@ -58,6 +68,7 @@ pub fn spawn_sampler(initial_interval: Duration) -> SamplerHandle {
             let start = Instant::now();
             system.refresh_cpu();
             system.refresh_memory();
+            system.refresh_processes();
 
             let cpu = system.global_cpu_info().cpu_usage().clamp(0.0, 100.0);
             let cores = system
@@ -72,6 +83,21 @@ pub fn spawn_sampler(initial_interval: Duration) -> SamplerHandle {
             } else {
                 (used_memory as f32 / total_memory as f32 * 100.0).clamp(0.0, 100.0)
             };
+            let mut processes: Vec<ProcessInfo> = system
+                .processes()
+                .iter()
+                .map(|(pid, process)| ProcessInfo {
+                    pid: pid.as_u32(),
+                    name: process.name().to_string(),
+                    memory_bytes: process.memory(),
+                })
+                .collect();
+            processes.sort_by(|a, b| {
+                b.memory_bytes
+                    .cmp(&a.memory_bytes)
+                    .then_with(|| a.name.cmp(&b.name))
+            });
+            processes.truncate(128);
 
             let _ = tx.try_send(Metrics {
                 cpu,
@@ -80,6 +106,7 @@ pub fn spawn_sampler(initial_interval: Duration) -> SamplerHandle {
                 used_memory,
                 total_memory,
                 sampled_at: Instant::now(),
+                processes,
             });
 
             let elapsed = start.elapsed();
