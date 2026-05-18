@@ -8,6 +8,7 @@ pub enum ThemeName {
     Ocean,
     Ember,
     Mono,
+    GruvboxDark,
 }
 
 impl ThemeName {
@@ -16,6 +17,7 @@ impl ThemeName {
             "ocean" => Some(Self::Ocean),
             "ember" => Some(Self::Ember),
             "mono" | "monochrome" => Some(Self::Mono),
+            "gruvbox" | "gruvbox-dark" | "gruvbox_dark" => Some(Self::GruvboxDark),
             _ => None,
         }
     }
@@ -24,15 +26,8 @@ impl ThemeName {
         match self {
             Self::Ocean => Self::Ember,
             Self::Ember => Self::Mono,
-            Self::Mono => Self::Ocean,
-        }
-    }
-
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Ocean => "ocean",
-            Self::Ember => "ember",
-            Self::Mono => "mono",
+            Self::Mono => Self::GruvboxDark,
+            Self::GruvboxDark => Self::Ocean,
         }
     }
 }
@@ -48,7 +43,7 @@ impl AppConfig {
     pub fn load() -> Self {
         let mut sample_ms = DEFAULT_SAMPLE_MS;
         let frame_ms = DEFAULT_FRAME_MS;
-        let mut theme = ThemeName::Ocean;
+        let mut theme = ThemeName::GruvboxDark;
 
         if let Ok(value) = env::var("RTOP_INTERVAL_MS") {
             if let Ok(parsed) = value.parse::<u64>() {

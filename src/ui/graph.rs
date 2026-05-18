@@ -63,7 +63,7 @@ pub fn braille_graph(
     lines
 }
 
-pub fn braille_graph_centered(
+pub fn braille_graph_top_down(
     history: &VecDeque<f32>,
     width: usize,
     height: usize,
@@ -71,12 +71,8 @@ pub fn braille_graph_centered(
     theme: ThemeName,
 ) -> Vec<Line<'static>> {
     let sample_width = width.saturating_mul(2);
-    let center = height / 2;
-    let top_rows = center;
-    let bottom_rows = height.saturating_sub(center);
-    let amp_rows = top_rows.min(bottom_rows).max(1);
-    let amp_dots = amp_rows.saturating_mul(4);
-    if sample_width == 0 || amp_dots == 0 {
+    let graph_height = height.saturating_mul(4);
+    if sample_width == 0 || graph_height == 0 {
         return Vec::new();
     }
 
@@ -84,6 +80,7 @@ pub fn braille_graph_centered(
     let visible = history.len().min(sample_width);
     let start = history.len().saturating_sub(visible);
     let left_pad = sample_width - visible;
+
     for (idx, value) in history.iter().skip(start).enumerate() {
         values[left_pad + idx] = *value;
     }
@@ -97,12 +94,11 @@ pub fn braille_graph_centered(
             for x in 0..2 {
                 let value = values[col * 2 + x];
                 peak = peak.max(value);
-                let amp = ((value / 100.0) * amp_dots as f32).round() as usize;
+                let filled = ((value / 100.0) * graph_height as f32).round() as usize;
+
                 for y in 0..4 {
-                    let dot_row = row * 4 + y;
-                    let center_dot = center * 4;
-                    let dist = dot_row.abs_diff(center_dot);
-                    if dist <= amp {
+                    let from_top = row * 4 + y + 1;
+                    if filled >= from_top {
                         bits |= braille_bit(x, y);
                     }
                 }
@@ -110,11 +106,7 @@ pub fn braille_graph_centered(
             let ch = char::from_u32(0x2800 + bits as u32).unwrap_or(' ');
             let age = col as f32 / width.max(1) as f32;
             let fg = if bits == 0 {
-                if row == center {
-                    Color::Rgb(55, 62, 73)
-                } else {
-                    Color::Rgb(28, 31, 37)
-                }
+                Color::Rgb(35, 39, 47)
             } else {
                 palette.color(theme, peak, age)
             };
@@ -122,6 +114,7 @@ pub fn braille_graph_centered(
         }
         lines.push(Line::from(spans));
     }
+
     lines
 }
 

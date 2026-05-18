@@ -9,17 +9,6 @@ pub enum Palette {
 }
 
 impl Palette {
-    pub fn accent(self, theme: ThemeName) -> Color {
-        match (theme, self) {
-            (ThemeName::Ocean, Self::Cpu) => Color::LightCyan,
-            (ThemeName::Ocean, Self::Memory) => Color::LightGreen,
-            (ThemeName::Ember, Self::Cpu) => Color::LightRed,
-            (ThemeName::Ember, Self::Memory) => Color::LightYellow,
-            (ThemeName::Mono, Self::Cpu) => Color::Gray,
-            (ThemeName::Mono, Self::Memory) => Color::White,
-        }
-    }
-
     pub fn color(self, theme: ThemeName, value: f32, age: f32) -> Color {
         let base = match (theme, self) {
             (ThemeName::Ocean, Self::Cpu) => gradient(
@@ -67,13 +56,28 @@ impl Palette {
                     (100.0, (255, 255, 255)),
                 ],
             ),
+            (ThemeName::GruvboxDark, Self::Cpu) => gradient(
+                value,
+                &[
+                    (0.0, (184, 187, 38)),
+                    (45.0, (250, 189, 47)),
+                    (78.0, (254, 128, 25)),
+                    (100.0, (204, 36, 29)),
+                ],
+            ),
+            (ThemeName::GruvboxDark, Self::Memory) => gradient(
+                value,
+                &[
+                    (0.0, (131, 165, 152)),
+                    (35.0, (142, 192, 124)),
+                    (65.0, (250, 189, 47)),
+                    (85.0, (254, 128, 25)),
+                    (100.0, (251, 73, 52)),
+                ],
+            ),
         };
-        let fade = 0.45 + age.clamp(0.0, 1.0) * 0.55;
-        Color::Rgb(
-            (base.0 as f32 * fade) as u8,
-            (base.1 as f32 * fade) as u8,
-            (base.2 as f32 * fade) as u8,
-        )
+        let _ = age;
+        Color::Rgb(base.0, base.1, base.2)
     }
 }
 
@@ -104,6 +108,15 @@ pub fn load_color(theme: ThemeName, value: f32) -> Color {
                 (50.0, (180, 180, 180)),
                 (80.0, (225, 225, 225)),
                 (100.0, (255, 255, 255)),
+            ],
+        ),
+        ThemeName::GruvboxDark => gradient(
+            value,
+            &[
+                (0.0, (184, 187, 38)),
+                (40.0, (250, 189, 47)),
+                (70.0, (254, 128, 25)),
+                (100.0, (251, 73, 52)),
             ],
         ),
     };

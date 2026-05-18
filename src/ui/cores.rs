@@ -14,10 +14,10 @@ pub fn core_lines(cores: &[f32], width: u16, height: u16, theme: ThemeName) -> V
     }
 
     let rows = height.max(1) as usize;
-    let columns = cores.len().div_ceil(rows).max(1);
+    let data_rows = rows.div_ceil(2).max(1);
+    let columns = cores.len().div_ceil(data_rows).max(1);
     let column_width = (width as usize).saturating_sub(columns - 1) / columns.max(1);
-    let compact = column_width < 15;
-    let used_rows = cores.len().min(rows);
+    let used_rows = cores.len().min(data_rows);
 
     if column_width < 8 {
         return vec![Line::from(Span::styled(
@@ -25,72 +25,72 @@ pub fn core_lines(cores: &[f32], width: u16, height: u16, theme: ThemeName) -> V
             Style::default().fg(Color::DarkGray),
         ))];
     }
-    let mut lines = Vec::with_capacity(used_rows);
 
+    let mut lines = Vec::with_capacity(rows);
     for row in 0..used_rows {
         let mut spans = Vec::new();
         for col in 0..columns {
-            let idx = row + col * rows;
+            let idx = row + col * data_rows;
             if idx >= cores.len() {
                 continue;
             }
             if col > 0 {
                 spans.push(Span::raw(" "));
             }
-            spans.extend(core_bar(idx, cores[idx], column_width, compact, theme));
+            spans.extend(core_braille_row(idx, cores[idx], column_width, theme));
         }
         lines.push(Line::from(spans));
+        if lines.len() < rows && row + 1 < used_rows {
+            lines.push(Line::from(Span::styled(
+                "·".repeat(width as usize),
+                Style::default().fg(Color::Rgb(48, 51, 58)),
+            )));
+        }
     }
 
     lines
 }
 
-fn core_bar(
+fn core_braille_row(
     index: usize,
     value: f32,
     width: usize,
-    compact: bool,
     theme: ThemeName,
 ) -> Vec<Span<'static>> {
-    if compact {
-        let cell = format!("{index:02}:{value:>3.0}%");
-        return vec![Span::styled(
-            pad_to(&cell, width),
-            Style::default().fg(load_color(theme, value)),
-        )];
-    }
+    let label = format!("{index:02}");
+    let pct = format!("{value:>3.0}%");
+    let bar_width = width.saturating_sub(label.len() + pct.len() + 2).max(3);
+    let bar = braille_bar(value, bar_width);
 
-    let label = format!("{index:02} ");
-    let pct = format!(" {:>4.0}%", value);
-    let bar_width = width.saturating_sub(label.len() + pct.len()).max(4);
-    let filled = ((value / 100.0) * bar_width as f32).round() as usize;
-
-    let mut spans = Vec::with_capacity(4);
-    spans.push(Span::styled(label, Style::default().fg(Color::DarkGray)));
-    spans.push(Span::styled(
-        "▌".repeat(filled.min(bar_width)),
-        Style::default().fg(load_color(theme, value)),
-    ));
-    spans.push(Span::styled(
-        " ".repeat(bar_width.saturating_sub(filled)),
-        Style::default()
-            .fg(Color::Rgb(24, 27, 33))
-            .bg(Color::Rgb(24, 27, 33)),
-    ));
-    spans.push(Span::styled(
-        pct,
-        Style::default().fg(load_color(theme, value)),
-    ));
-    spans
+    vec![
+        Span::styled(label, Style::default().fg(Color::DarkGray)),
+        Span::raw(" "),
+        Span::styled(bar, Style::default().fg(load_color(theme, value))),
+        Span::raw(" "),
+        Span::styled(pct, Style::default().fg(load_color(theme, value))),
+    ]
 }
 
-fn pad_to(content: &str, width: usize) -> String {
-    if content.len() >= width {
-        content[..width].to_string()
-    } else {
-        let mut out = String::with_capacity(width);
-        out.push_str(content);
-        out.push_str(&" ".repeat(width - content.len()));
-        out
+fn braille_bar(value: f32, width: usize) -> String {
+    let mut out = String::with_capacity(width);
+    let level = (value.clamp(0.0, 100.0) / 100.0) * width as f32;
+    for i in 0..width {
+        let local = (level - i as f32).clamp(0.0, 1.0);
+        out.push(quantized_braille(local));
+    }
+    out
+}
+
+fn quantized_braille(v: f32) -> char {
+    match (v * 8.0).round() as u8 {
+        0 => '⠀',
+        1 => '⢀',
+        2 => '⢠',
+        3 => '⢰',
+        4 => '⢸',
+        5 => '⣸',
+        6 => '⣾',
+        7 => '⣿',
+        _ => '⣿',
     }
 }

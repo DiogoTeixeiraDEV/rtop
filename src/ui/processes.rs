@@ -3,9 +3,14 @@ use ratatui::{
     text::{Line, Span},
 };
 
-use crate::metrics::ProcessInfo;
+use crate::{config::ThemeName, metrics::ProcessInfo, ui::color::load_color};
 
-pub fn process_lines(processes: &[ProcessInfo], width: u16, height: u16) -> Vec<Line<'static>> {
+pub fn process_lines(
+    processes: &[ProcessInfo],
+    width: u16,
+    height: u16,
+    theme: ThemeName,
+) -> Vec<Line<'static>> {
     if height == 0 || width < 14 {
         return vec![];
     }
@@ -39,12 +44,18 @@ pub fn process_lines(processes: &[ProcessInfo], width: u16, height: u16) -> Vec<
             Span::raw(" "),
             Span::styled(
                 pad_left(&format_mem(process.memory_bytes), ram_w),
-                Style::default().fg(Color::Rgb(110, 210, 185)),
+                Style::default().fg(load_color(theme, mem_color_value(process.memory_bytes))),
             ),
         ]));
     }
 
     lines
+}
+
+fn mem_color_value(bytes: u64) -> f32 {
+    let gib = bytes as f32 / 1024.0 / 1024.0 / 1024.0;
+    let normalized = (gib / 8.0).clamp(0.0, 1.0);
+    (normalized.powf(0.75) * 100.0).clamp(8.0, 100.0)
 }
 
 fn format_mem(bytes: u64) -> String {
